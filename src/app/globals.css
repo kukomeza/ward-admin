@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+body {
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Form controls default to high-contrast dark text */
+input,
+textarea,
+select {
+  color: #0f172a;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748b;
+}
+
+/* Dark mode inputs (specifically in pulpit / live view) */
+.dark-input,
+input.dark-input {
+  color: #ffffff !important;
+}
+
+.dark-input::placeholder,
+input.dark-input::placeholder {
+  color: #94a3b8 !important;
+}
