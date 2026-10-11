@@ -101,6 +101,16 @@ export default function MeetingPrintPage({
                 {meeting.conducting_name || "—"}
               </strong>
             </div>
+            <div>
+              <span className="text-xs text-slate-500 uppercase tracking-wider block">
+                Asistencia Total:
+              </span>
+              <strong className="text-slate-900">
+                {Number(meeting.total_attendance) > 0
+                  ? `${meeting.total_attendance} personas (${meeting.attending_families_count || 0} fam.)`
+                  : "______"}
+              </strong>
+            </div>
           </div>
         </div>
 

@@ -97,8 +97,28 @@ export async function ensureDatabase() {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS attendance_families (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      default_count INTEGER NOT NULL DEFAULT 1,
+      notes TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS meeting_attendance (
+      id TEXT PRIMARY KEY,
+      meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+      family_id TEXT NOT NULL REFERENCES attendance_families(id) ON DELETE CASCADE,
+      attendees_count INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(meeting_id, family_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_assignments_person_task ON task_assignments(person_id, task_type_id);
     CREATE INDEX IF NOT EXISTS idx_meetings_date ON meetings(meeting_date);
+    CREATE INDEX IF NOT EXISTS idx_meeting_attendance_meeting ON meeting_attendance(meeting_id);
   `);
 
   // Check if seed data exists

@@ -47,7 +47,9 @@ export async function getMeetings(status?: string): Promise<Meeting[]> {
       mt.name AS meeting_type_name,
       mt.code AS meeting_type_code,
       (p_pres.first_name || ' ' || p_pres.last_name) AS presiding_name,
-      (p_cond.first_name || ' ' || p_cond.last_name) AS conducting_name
+      (p_cond.first_name || ' ' || p_cond.last_name) AS conducting_name,
+      COALESCE((SELECT SUM(attendees_count) FROM meeting_attendance ma WHERE ma.meeting_id = m.id), 0) AS total_attendance,
+      COALESCE((SELECT COUNT(*) FROM meeting_attendance ma WHERE ma.meeting_id = m.id AND ma.attendees_count > 0), 0) AS attending_families_count
     FROM meetings m
     JOIN meeting_types mt ON m.meeting_type_id = mt.id
     LEFT JOIN persons p_pres ON m.presiding_person_id = p_pres.id
@@ -84,7 +86,9 @@ export async function getMeetingById(id: string): Promise<{
         (p_pres.first_name || ' ' || p_pres.last_name) AS presiding_name,
         p_pres.phone AS presiding_phone,
         (p_cond.first_name || ' ' || p_cond.last_name) AS conducting_name,
-        p_cond.phone AS conducting_phone
+        p_cond.phone AS conducting_phone,
+        COALESCE((SELECT SUM(attendees_count) FROM meeting_attendance ma WHERE ma.meeting_id = m.id), 0) AS total_attendance,
+        COALESCE((SELECT COUNT(*) FROM meeting_attendance ma WHERE ma.meeting_id = m.id AND ma.attendees_count > 0), 0) AS attending_families_count
       FROM meetings m
       JOIN meeting_types mt ON m.meeting_type_id = mt.id
       LEFT JOIN persons p_pres ON m.presiding_person_id = p_pres.id
@@ -297,6 +301,10 @@ export async function updateMeeting(
 
 export async function deleteMeeting(id: string): Promise<boolean> {
   await ensureDatabase();
+  await db.execute({ sql: "DELETE FROM meeting_attendance WHERE meeting_id = ?", args: [id] });
+  await db.execute({ sql: "DELETE FROM task_assignments WHERE meeting_id = ?", args: [id] });
+  await db.execute({ sql: "DELETE FROM meeting_visitor_notes WHERE meeting_id = ?", args: [id] });
+  await db.execute({ sql: "DELETE FROM meeting_items WHERE meeting_id = ?", args: [id] });
   await db.execute({ sql: "DELETE FROM meetings WHERE id = ?", args: [id] });
   return true;
 }

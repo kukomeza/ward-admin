@@ -24,9 +24,11 @@ import {
   Loader2,
   CheckCircle,
   FileText,
-  ListOrdered
+  ListOrdered,
+  UserCheck
 } from "lucide-react";
 import AnnouncementListManager from "@/components/AnnouncementListManager";
+import MeetingAttendanceManager from "@/components/MeetingAttendanceManager";
 import WhatsAppNotifyModal, { WhatsAppIcon } from "@/components/WhatsAppNotifyModal";
 import { buildWhatsAppMessage } from "@/lib/whatsapp";
 import Link from "next/link";
@@ -46,6 +48,11 @@ export default function MeetingDetailPage({
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+
+  // Attendance summary state
+  const [totalAttendance, setTotalAttendance] = useState(0);
+  const [attendingFamiliesCount, setAttendingFamiliesCount] = useState(0);
+  const [activeViewTab, setActiveViewTab] = useState<"ALL" | "AGENDA" | "ATTENDANCE">("ALL");
 
   // Modal assign state
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -80,6 +87,10 @@ export default function MeetingDetailPage({
         setMeeting(meetingData.data.meeting);
         setItems(meetingData.data.items);
         setAssignments(meetingData.data.assignments);
+        setTotalAttendance(Number(meetingData.data.meeting.total_attendance) || 0);
+        setAttendingFamiliesCount(
+          Number(meetingData.data.meeting.attending_families_count) || 0
+        );
       }
       if (tasksData.success) {
         setTaskTypes(tasksData.data);
@@ -259,6 +270,31 @@ export default function MeetingDetailPage({
     }
   };
 
+  const handleDeleteMeeting = async () => {
+    if (!meeting) return;
+    if (
+      !confirm(
+        `¿Estás seguro de eliminar la reunión "${meeting.title}"?\n\nSe borrarán su agenda, asignaciones y el registro de asistencia de esta reunión.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/meetings/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        router.push("/");
+      } else {
+        alert(data.error || "No se pudo eliminar la reunión");
+      }
+    } catch (err) {
+      console.error("Error deleting meeting:", err);
+    }
+  };
+
   // Add block
   const handleAddBlock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -345,7 +381,16 @@ export default function MeetingDetailPage({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleDeleteMeeting}
+              className="px-3 py-2 rounded-lg text-sm font-medium text-red-600 bg-white border border-red-200 hover:bg-red-50 flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+              title="Eliminar esta reunión"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Eliminar</span>
+            </button>
             <Link
               href={`/meetings/${id}/print`}
               className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5 shadow-2xs transition-colors"
@@ -460,28 +505,73 @@ export default function MeetingDetailPage({
               </div>
             </div>
 
-            {/* Resumen */}
+            {/* Resumen y Asistencia */}
             <div className="pt-3 md:pt-0 md:pl-4 flex items-start gap-3">
               <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
-                <CheckCircle className="w-5 h-5" />
+                <UserCheck className="w-5 h-5" />
               </div>
               <div>
                 <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Participantes
+                  Asistencia y Programa
                 </span>
-                <p className="text-sm font-semibold text-slate-900 mt-0.5">
-                  {assignments.length} asignaciones
+                <p className="text-sm font-bold text-emerald-700 mt-0.5">
+                  {totalAttendance} asistentes ({attendingFamiliesCount} fam.)
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {items.length} bloques en programa
+                  {assignments.length} asignaciones • {items.length} bloques
                 </p>
               </div>
             </div>
           </div>
         </div>
 
+        {/* Selector de Vista: Programa / Lista de Asistencia */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setActiveViewTab("ALL")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                activeViewTab === "ALL"
+                  ? "bg-slate-900 text-white shadow-2xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              Ver Todo (Programa + Asistencia)
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveViewTab("AGENDA")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeViewTab === "AGENDA"
+                  ? "bg-blue-600 text-white shadow-2xs"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>Programa ({items.length} bloques)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveViewTab("ATTENDANCE")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeViewTab === "ATTENDANCE"
+                  ? "bg-emerald-600 text-white shadow-2xs"
+                  : "text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100"
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>
+                Lista de Asistencia ({totalAttendance}{" "}
+                {totalAttendance === 1 ? "persona" : "personas"})
+              </span>
+            </button>
+          </div>
+        </div>
+
         {/* Agenda Section */}
-        <div className="space-y-4">
+        {(activeViewTab === "ALL" || activeViewTab === "AGENDA") && (
+        <div className="space-y-4 mb-8">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-slate-900">
@@ -999,6 +1089,20 @@ export default function MeetingDetailPage({
             })}
           </div>
         </div>
+        )}
+
+        {/* Lista de Asistencia Section */}
+        {(activeViewTab === "ALL" || activeViewTab === "ATTENDANCE") && (
+          <div id="attendance-section" className="mb-8">
+            <MeetingAttendanceManager
+              meetingId={id}
+              onTotalsChange={(total, families) => {
+                setTotalAttendance(total);
+                setAttendingFamiliesCount(families);
+              }}
+            />
+          </div>
+        )}
 
         {/* Modal Add Block */}
         {showAddBlockModal && (

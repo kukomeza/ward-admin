@@ -59,6 +59,8 @@ export interface Meeting {
   conducting_name?: string;
   presiding_phone?: string | null;
   conducting_phone?: string | null;
+  total_attendance?: number;
+  attending_families_count?: number;
 }
 
 export interface MeetingItem {
@@ -134,4 +136,24 @@ export interface PersonCandidateStatus {
   conflict_details?: string;
   last_any_task_date?: string;
   last_any_task_name?: string;
+}
+
+export interface AttendanceFamily {
+  id: string;
+  name: string;
+  default_count: number;
+  notes?: string | null;
+  is_active: number;
+  created_at: string;
+}
+
+export interface MeetingAttendanceItem {
+  family_id: string;
+  family_name: string;
+  default_count: number;
+  family_notes?: string | null;
+  attendees_count: number;
+  attendance_id?: string | null;
+  attendance_notes?: string | null;
+  updated_at?: string | null;
 }

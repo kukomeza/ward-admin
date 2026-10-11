@@ -17,7 +17,8 @@ import {
   Sparkles,
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from "lucide-react";
 import Link from "next/link";
 
@@ -45,6 +46,27 @@ export default function HomePage() {
   useEffect(() => {
     loadMeetings();
   }, []);
+
+  const handleDeleteMeeting = async (meetingId: string, title: string) => {
+    if (
+      !confirm(
+        `¿Estás seguro de que deseas eliminar la reunión "${title}"? Se borrarán su programa y asignaciones.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/meetings/${meetingId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMeetings((prev) => prev.filter((m) => m.id !== meetingId));
+      }
+    } catch (err) {
+      console.error("Error eliminando reunión:", err);
+    }
+  };
 
   const filteredMeetings = meetings.filter((m) => {
     const matchesStatus =
@@ -196,6 +218,14 @@ export default function HomePage() {
                           {m.conducting_name || "—"}
                         </span>
                       </div>
+                      <div className="flex items-center justify-between text-slate-600 pt-0.5">
+                        <span className="text-slate-400">Asistencia:</span>
+                        <span className="font-semibold text-emerald-700">
+                          {Number(m.total_attendance) > 0
+                            ? `${m.total_attendance} personas (${m.attending_families_count || 0} fam.)`
+                            : "Sin registrar"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -209,7 +239,15 @@ export default function HomePage() {
                       <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMeeting(m.id, m.title)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                        title="Eliminar reunión"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                       <Link
                         href={`/meetings/${m.id}/print`}
                         className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 transition-colors"

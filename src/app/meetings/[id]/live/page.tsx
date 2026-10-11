@@ -18,6 +18,7 @@ import {
   Loader2
 } from "lucide-react";
 import Link from "next/link";
+import MeetingAttendanceManager from "@/components/MeetingAttendanceManager";
 
 export default function MeetingLivePage({
   params,
@@ -515,6 +516,11 @@ export default function MeetingLivePage({
               );
             })}
           </div>
+        </section>
+
+        {/* Control de Asistencia en Vivo */}
+        <section className="pt-4">
+          <MeetingAttendanceManager meetingId={id} darkMode={true} />
         </section>
       </main>
     </div>
