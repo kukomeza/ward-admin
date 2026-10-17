@@ -187,3 +187,236 @@ export async function removeAttendanceFamily(
   });
 }
 
+export interface MeetingAttendanceTrendItem {
+  meeting_id: string;
+  title: string;
+  meeting_date: string;
+  meeting_type_name: string;
+  total_attendees: number;
+  present_families_count: number;
+}
+
+export interface FamilyAttendanceHistoryPoint {
+  meeting_id: string;
+  meeting_date: string;
+  meeting_title: string;
+  attendees_count: number;
+}
+
+export interface FamilyAttendanceStat {
+  family_id: string;
+  family_name: string;
+  default_count: number;
+  meetings_attended: number;
+  total_meetings_evaluated: number;
+  attendance_rate: number;
+  average_count_when_present: number;
+  last_attended_date: string | null;
+  last_attended_count: number;
+  consecutive_absences: number;
+  history: FamilyAttendanceHistoryPoint[];
+}
+
+export interface AttendanceAnalytics {
+  summary: {
+    totalMeetingsRecorded: number;
+    averageAttendanceAllTime: number;
+    averageAttendanceQuarter: number;
+    maxAttendance: number;
+    maxAttendanceDate: string | null;
+    latestAttendance: number;
+    latestAttendanceDate: string | null;
+    totalActiveFamilies: number;
+    familiesAlertCount: number;
+  };
+  meetingTrends: MeetingAttendanceTrendItem[];
+  familyStats: FamilyAttendanceStat[];
+}
+
+/**
+ * Calcula las estadísticas de asistencia, tendencia por domingo,
+ * historial individual por familia y alertas de ministración (inasistencias consecutivas).
+ */
+export async function getAttendanceAnalytics(): Promise<AttendanceAnalytics> {
+  await ensureDatabase();
+
+  // 1. Obtener todas las reuniones donde se ha registrado asistencia (> 0 asistentes), ordenadas por fecha ASC
+  const meetingsRes = await db.execute(`
+    SELECT
+      m.id AS meeting_id,
+      m.title,
+      m.meeting_date,
+      COALESCE(mt.name, 'Reunión') AS meeting_type_name,
+      COALESCE(SUM(ma.attendees_count), 0) AS total_attendees,
+      COUNT(CASE WHEN ma.attendees_count > 0 THEN 1 END) AS present_families_count
+    FROM meetings m
+    LEFT JOIN meeting_types mt ON mt.id = m.meeting_type_id
+    LEFT JOIN meeting_attendance ma ON ma.meeting_id = m.id
+    GROUP BY m.id
+    HAVING COALESCE(SUM(ma.attendees_count), 0) > 0
+    ORDER BY m.meeting_date ASC, m.created_at ASC
+  `);
+
+  const meetingTrends: MeetingAttendanceTrendItem[] = meetingsRes.rows.map(
+    (r) => ({
+      meeting_id: String(r.meeting_id),
+      title: String(r.title),
+      meeting_date: String(r.meeting_date),
+      meeting_type_name: String(r.meeting_type_name),
+      total_attendees: Number(r.total_attendees) || 0,
+      present_families_count: Number(r.present_families_count) || 0,
+    })
+  );
+
+  // 2. Obtener todas las familias activas del padrón
+  const familiesRes = await db.execute(`
+    SELECT id, name, default_count
+    FROM attendance_families
+    WHERE is_active = 1
+    ORDER BY name COLLATE NOCASE ASC
+  `);
+
+  // 3. Obtener todos los registros de asistencia por reunión y familia
+  const recordsRes = await db.execute(`
+    SELECT meeting_id, family_id, attendees_count
+    FROM meeting_attendance
+    WHERE attendees_count > 0
+  `);
+
+  const attendanceMap = new Map<string, number>();
+  for (const row of recordsRes.rows) {
+    const key = `${String(row.meeting_id)}::${String(row.family_id)}`;
+    attendanceMap.set(key, Number(row.attendees_count) || 0);
+  }
+
+  const totalMeetingsRecorded = meetingTrends.length;
+
+  // 4. Construir historial por cada familia
+  const familyStats: FamilyAttendanceStat[] = familiesRes.rows.map((fam) => {
+    const familyId = String(fam.id);
+    const familyName = String(fam.name);
+    const defaultCount = Number(fam.default_count) || 1;
+
+    const historyChronological: FamilyAttendanceHistoryPoint[] =
+      meetingTrends.map((m) => {
+        const count = attendanceMap.get(`${m.meeting_id}::${familyId}`) || 0;
+        return {
+          meeting_id: m.meeting_id,
+          meeting_date: m.meeting_date,
+          meeting_title: m.title,
+          attendees_count: count,
+        };
+      });
+
+    const attendedPoints = historyChronological.filter(
+      (h) => h.attendees_count > 0
+    );
+    const meetingsAttended = attendedPoints.length;
+    const attendanceRate =
+      totalMeetingsRecorded > 0
+        ? Math.round((meetingsAttended / totalMeetingsRecorded) * 100)
+        : 0;
+
+    const totalPresentSum = attendedPoints.reduce(
+      (acc, p) => acc + p.attendees_count,
+      0
+    );
+    const averageCountWhenPresent =
+      meetingsAttended > 0
+        ? Math.round((totalPresentSum / meetingsAttended) * 10) / 10
+        : 0;
+
+    const lastAttended =
+      attendedPoints.length > 0
+        ? attendedPoints[attendedPoints.length - 1]
+        : null;
+
+    // Calcular ausencias consecutivas desde la reunión más reciente hacia atrás
+    let consecutiveAbsences = 0;
+    for (let i = historyChronological.length - 1; i >= 0; i--) {
+      if (historyChronological[i].attendees_count === 0) {
+        consecutiveAbsences++;
+      } else {
+        break;
+      }
+    }
+
+    return {
+      family_id: familyId,
+      family_name: familyName,
+      default_count: defaultCount,
+      meetings_attended: meetingsAttended,
+      total_meetings_evaluated: totalMeetingsRecorded,
+      attendance_rate: attendanceRate,
+      average_count_when_present: averageCountWhenPresent,
+      last_attended_date: lastAttended ? lastAttended.meeting_date : null,
+      last_attended_count: lastAttended ? lastAttended.attendees_count : 0,
+      consecutive_absences: consecutiveAbsences,
+      // Mostrar de la más reciente a la más antigua para inspección rápida
+      history: [...historyChronological].reverse(),
+    };
+  });
+
+  // 5. Calcular métricas de resumen
+  const totalSumAll = meetingTrends.reduce(
+    (acc, m) => acc + m.total_attendees,
+    0
+  );
+  const averageAttendanceAllTime =
+    totalMeetingsRecorded > 0 ? Math.round(totalSumAll / totalMeetingsRecorded) : 0;
+
+  // Promedio trimestral (últimas 12 reuniones o últimos 90 días)
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  const cutoffStr = ninetyDaysAgo.toISOString().slice(0, 10);
+
+  const quarterMeetings = meetingTrends.filter(
+    (m) => m.meeting_date >= cutoffStr
+  );
+  const quarterPool =
+    quarterMeetings.length > 0 ? quarterMeetings : meetingTrends.slice(-12);
+  const averageAttendanceQuarter =
+    quarterPool.length > 0
+      ? Math.round(
+          quarterPool.reduce((acc, m) => acc + m.total_attendees, 0) /
+            quarterPool.length
+        )
+      : 0;
+
+  let maxAttendance = 0;
+  let maxAttendanceDate: string | null = null;
+  for (const m of meetingTrends) {
+    if (m.total_attendees >= maxAttendance) {
+      maxAttendance = m.total_attendees;
+      maxAttendanceDate = m.meeting_date;
+    }
+  }
+
+  const latestMeeting =
+    meetingTrends.length > 0 ? meetingTrends[meetingTrends.length - 1] : null;
+
+  const alertThreshold = totalMeetingsRecorded >= 3 ? 3 : 2;
+  const familiesAlertCount =
+    totalMeetingsRecorded >= 2
+      ? familyStats.filter((f) => f.consecutive_absences >= alertThreshold)
+          .length
+      : 0;
+
+  return {
+    summary: {
+      totalMeetingsRecorded,
+      averageAttendanceAllTime,
+      averageAttendanceQuarter,
+      maxAttendance,
+      maxAttendanceDate,
+      latestAttendance: latestMeeting ? latestMeeting.total_attendees : 0,
+      latestAttendanceDate: latestMeeting ? latestMeeting.meeting_date : null,
+      totalActiveFamilies: familyStats.length,
+      familiesAlertCount,
+    },
+    meetingTrends,
+    familyStats,
+  };
+}
+
+

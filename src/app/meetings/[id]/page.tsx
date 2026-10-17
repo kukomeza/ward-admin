@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import AnnouncementListManager from "@/components/AnnouncementListManager";
 import MeetingAttendanceManager from "@/components/MeetingAttendanceManager";
+import HymnSelector from "@/components/HymnSelector";
 import WhatsAppNotifyModal, { WhatsAppIcon } from "@/components/WhatsAppNotifyModal";
 import { buildWhatsAppMessage } from "@/lib/whatsapp";
 import Link from "next/link";
@@ -200,6 +201,33 @@ export default function MeetingDetailPage({
     }
   };
 
+  // Update both hymn_number and hymn_title together (from HymnSelector catalog or inputs)
+  const handleUpdateHymn = async (
+    itemId: string,
+    hymnNumber: string,
+    hymnTitle: string
+  ) => {
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === itemId
+          ? { ...it, hymn_number: hymnNumber, hymn_title: hymnTitle }
+          : it
+      )
+    );
+    try {
+      await fetch(`/api/meetings/${id}/items/${itemId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hymn_number: hymnNumber,
+          hymn_title: hymnTitle,
+        }),
+      });
+    } catch (err) {
+      console.error("Error updating hymn:", err);
+    }
+  };
+
   // WhatsApp notification launcher for assignments (Speakers, Prayers, Music, Sacrament, etc.)
   const handleOpenWhatsAppForAssignment = (
     assignment: TaskAssignment,
@@ -216,6 +244,8 @@ export default function MeetingDetailPage({
       taskCode: assignment.task_code,
       taskName: assignment.task_name,
       topic: item?.speaker_topic || null,
+      hymnNumber: item?.hymn_number || null,
+      hymnTitle: item?.hymn_title || null,
       notes: customNotes || assignment.notes || null,
     });
 
@@ -640,27 +670,13 @@ export default function MeetingDetailPage({
 
                       {/* Item-specific inputs */}
                       {item.item_type === "HYMN" && (
-                        <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                          <Music className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                          <input
-                            type="text"
-                            placeholder="Nº Himno (ej. 136)"
-                            defaultValue={item.hymn_number || ""}
-                            onBlur={(e) =>
-                              handleUpdateItemField(item.id, "hymn_number", e.target.value)
-                            }
-                            className="w-24 px-2 py-1 bg-slate-50 border border-slate-200 rounded-md focus:bg-white focus:ring-1 focus:ring-blue-500 text-slate-900 font-medium placeholder:text-slate-400"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Nombre del himno (ej. Ya brilla el sol)"
-                            defaultValue={item.hymn_title || ""}
-                            onBlur={(e) =>
-                              handleUpdateItemField(item.id, "hymn_title", e.target.value)
-                            }
-                            className="flex-1 min-w-[200px] px-2 py-1 bg-slate-50 border border-slate-200 rounded-md focus:bg-white focus:ring-1 focus:ring-blue-500 text-slate-900 font-medium placeholder:text-slate-400"
-                          />
-                        </div>
+                        <HymnSelector
+                          itemId={item.id}
+                          blockTitle={item.title}
+                          hymnNumber={item.hymn_number}
+                          hymnTitle={item.hymn_title}
+                          onUpdateHymn={handleUpdateHymn}
+                        />
                       )}
 
                       {item.item_type === "TALK" && (

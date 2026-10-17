@@ -1,3 +1,5 @@
+import { getHymnGospelLibraryUrl } from "./hymns";
+
 /**
  * Utilidades para generación y envío de notificaciones por WhatsApp
  * para asignaciones en reuniones de la Rama.
@@ -53,6 +55,7 @@ export interface BuildWhatsAppParams {
   taskCode?: string; // "TALK", "PRAYER", "MUSIC_CONDUCT", "BLESS_SACRAMENT", "PASS_SACRAMENT", "PRESIDE", "CONDUCT", etc.
   taskName?: string; // "Discursar", "Primera Oración", etc.
   topic?: string | null; // speaker_topic
+  hymnNumber?: string | null;
   hymnTitle?: string | null;
   notes?: string | null; // ej. "Pan" o "Agua"
 }
@@ -70,6 +73,8 @@ export function buildWhatsAppMessage(params: BuildWhatsAppParams): string {
     taskCode,
     taskName,
     topic,
+    hymnNumber,
+    hymnTitle,
     notes,
   } = params;
 
@@ -101,9 +106,14 @@ Agradecemos confirmar si podrá acompañarnos. ¡Muchas gracias por su fiel serv
 
   // 3. DIRIGIR HIMNOS / MÚSICA
   if (taskCode === "MUSIC_CONDUCT" || (taskName && taskName.toLowerCase().includes("himno"))) {
+    const hasHymn = Boolean(hymnNumber?.trim() || hymnTitle?.trim());
+    const hymnLine = hasHymn
+      ? `\n\n🎵 *Himno:* ${hymnNumber ? `#${hymnNumber} ` : ""}${hymnTitle ? `"${hymnTitle}"` : ""}\n🔗 *Escuchar en Biblioteca del Evangelio:* ${getHymnGospelLibraryUrl(hymnNumber, hymnTitle)}`
+      : "";
+
     return `Estimado(a) hermano(a) ${recipientName}:
 
-Reciba un cordial saludo. La Presidencia de la Rama le invita a dirigir los himnos en la reunión${meetingTypeStr} del día ${dateFormatted}${timeFormatted ? ` a las ${timeFormatted}` : ""}.
+Reciba un cordial saludo. La Presidencia de la Rama le invita a dirigir los himnos en la reunión${meetingTypeStr} del día ${dateFormatted}${timeFormatted ? ` a las ${timeFormatted}` : ""}.${hymnLine}
 
 Agradecemos confirmar si podrá acompañarnos. ¡Muchas gracias por su disposición y servicio!`;
   }

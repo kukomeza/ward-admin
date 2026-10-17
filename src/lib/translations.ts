@@ -126,3 +126,109 @@ export function parseSacramentAssignments(
   };
 }
 
+export type OfficialBusinessType =
+  | "SUSTAINING"
+  | "RELEASE"
+  | "WELCOME_MEMBER"
+  | "ORDINATION"
+  | "ANNOUNCEMENT";
+
+export interface ParsedOfficialBusiness {
+  type: OfficialBusinessType;
+  badgeLabel: string;
+  personName?: string;
+  detail?: string;
+  summaryText: string;
+  pulpitScript?: string;
+  rawText: string;
+}
+
+export function formatOfficialBusinessEntry(
+  type: Exclude<OfficialBusinessType, "ANNOUNCEMENT">,
+  personName: string,
+  detail: string
+): string {
+  const cleanName = personName.trim();
+  const cleanDetail = detail.trim();
+  switch (type) {
+    case "SUSTAINING":
+      return `[SOSTENIMIENTO] ${cleanName} — ${cleanDetail}`;
+    case "RELEASE":
+      return `[RELEVO] ${cleanName} — ${cleanDetail}`;
+    case "WELCOME_MEMBER":
+      return `[BIENVENIDA] ${cleanName} — ${cleanDetail}`;
+    case "ORDINATION":
+      return `[ORDENACIÓN] ${cleanName} — ${cleanDetail}`;
+  }
+}
+
+export function parseOfficialBusinessItem(rawText: string): ParsedOfficialBusiness {
+  const text = rawText.trim();
+
+  const match = text.match(
+    /^\[(SOSTENIMIENTO|RELEVO|BIENVENIDA|ORDENACI[ÓO]N)\]\s*(.+?)\s*(?:—|--|-)\s*(.+)$/i
+  );
+
+  if (match) {
+    const tag = match[1].toUpperCase();
+    const personName = match[2].trim();
+    const detail = match[3].trim();
+
+    if (tag === "SOSTENIMIENTO") {
+      return {
+        type: "SUSTAINING",
+        badgeLabel: "Sostenimiento",
+        personName,
+        detail,
+        summaryText: `Sostener a ${personName} como ${detail}`,
+        pulpitScript: `«Se propone que sostengamos a ${personName} como ${detail}. Los que estén a favor, sírvanse manifestarlo levantando la mano. [Pausa]. Los que estén en contra, si los hay, pueden manifestarlo también.»`,
+        rawText: text,
+      };
+    }
+
+    if (tag === "RELEVO") {
+      return {
+        type: "RELEASE",
+        badgeLabel: "Relevo",
+        personName,
+        detail,
+        summaryText: `Relevo de ${personName} como ${detail}`,
+        pulpitScript: `«Se ha relevado a ${personName} como ${detail}. Quienes deseen expresar su agradecimiento por su servicio dedicado, sírvanse manifestarlo levantando la mano.»`,
+        rawText: text,
+      };
+    }
+
+    if (tag === "BIENVENIDA") {
+      return {
+        type: "WELCOME_MEMBER",
+        badgeLabel: "Nuevo Miembro",
+        personName,
+        detail,
+        summaryText: `Bienvenida de ${personName} (${detail})`,
+        pulpitScript: `«Proponemos que se reciba a ${personName} en plena comunión en nuestra Rama/Barrio (${detail}). Los que estén a favor de darle la bienvenida, sírvanse manifestarlo levantando la mano.»`,
+        rawText: text,
+      };
+    }
+
+    if (tag === "ORDENACIÓN" || tag === "ORDENACION") {
+      return {
+        type: "ORDINATION",
+        badgeLabel: "Ordenación",
+        personName,
+        detail,
+        summaryText: `Ordenar a ${personName} al oficio de ${detail}`,
+        pulpitScript: `«Se propone que ${personName} reciba el Sacerdocio Aarónico y sea ordenado al oficio de ${detail}. Los que estén a favor, sírvanse manifestarlo levantando la mano. [Pausa]. Los que estén en contra, si los hay, pueden manifestarlo.»`,
+        rawText: text,
+      };
+    }
+  }
+
+  return {
+    type: "ANNOUNCEMENT",
+    badgeLabel: "Anuncio",
+    summaryText: text,
+    rawText: text,
+  };
+}
+
+

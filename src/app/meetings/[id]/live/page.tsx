@@ -2,7 +2,12 @@
 
 import { useEffect, useState, use } from "react";
 import { Meeting, MeetingItem, MeetingVisitorNote, TaskAssignment } from "@/lib/types";
-import { parseAnnouncementList, isSacramentItem, parseSacramentAssignments } from "@/lib/translations";
+import {
+  parseAnnouncementList,
+  isSacramentItem,
+  parseSacramentAssignments,
+  parseOfficialBusinessItem,
+} from "@/lib/translations";
 import { 
   ArrowLeft, 
   CheckCircle, 
@@ -15,10 +20,13 @@ import {
   Radio, 
   Check, 
   Sparkles,
-  Loader2
+  Loader2,
+  PlayCircle,
+  ExternalLink
 } from "lucide-react";
 import Link from "next/link";
 import MeetingAttendanceManager from "@/components/MeetingAttendanceManager";
+import { getHymnGospelLibraryUrl } from "@/lib/hymns";
 
 export default function MeetingLivePage({
   params,
@@ -378,25 +386,56 @@ export default function MeetingLivePage({
                       </div>
                     )}
 
-                    {/* Asuntos: Lista ordenada de asuntos a mencionar */}
+                    {/* Asuntos: Lista ordenada de asuntos y negocios oficiales */}
                     {item.item_type === "ANNOUNCEMENT" && (
-                      <div className="pt-1 space-y-1.5">
+                      <div className="pt-1 space-y-2">
                         {parseAnnouncementList(item.notes).length > 0 ? (
-                          <div className="space-y-1.5 pt-0.5">
+                          <div className="space-y-2 pt-0.5">
                             <span className="text-2xs font-bold uppercase tracking-wider text-slate-400 block">
-                              Lista de asuntos a mencionar:
+                              Lista de asuntos y anuncios para el púlpito:
                             </span>
-                            {parseAnnouncementList(item.notes).map((asunto, aIdx) => (
-                              <div
-                                key={aIdx}
-                                className="flex items-start gap-2 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 text-white"
-                              >
-                                <span className="w-5 h-5 rounded-full bg-blue-900/80 text-blue-300 font-bold text-2xs flex items-center justify-center shrink-0 mt-0.5">
-                                  {aIdx + 1}
-                                </span>
-                                <span className="text-sm font-medium">{asunto}</span>
-                              </div>
-                            ))}
+                            {parseAnnouncementList(item.notes).map((asunto, aIdx) => {
+                              const parsed = parseOfficialBusinessItem(asunto);
+                              const badgeClass =
+                                parsed.type === "SUSTAINING"
+                                  ? "bg-emerald-950/80 text-emerald-300 border-emerald-700/60"
+                                  : parsed.type === "RELEASE"
+                                  ? "bg-amber-950/80 text-amber-300 border-amber-700/60"
+                                  : parsed.type === "WELCOME_MEMBER"
+                                  ? "bg-indigo-950/80 text-indigo-300 border-indigo-700/60"
+                                  : parsed.type === "ORDINATION"
+                                  ? "bg-purple-950/80 text-purple-300 border-purple-700/60"
+                                  : "bg-slate-800 text-slate-300 border-slate-700";
+
+                              return (
+                                <div
+                                  key={aIdx}
+                                  className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-white space-y-1.5"
+                                >
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="w-5 h-5 rounded-full bg-blue-900/80 text-blue-300 font-bold text-2xs flex items-center justify-center shrink-0">
+                                      {aIdx + 1}
+                                    </span>
+                                    <span
+                                      className={`text-2xs font-bold px-2 py-0.5 rounded-md border ${badgeClass}`}
+                                    >
+                                      {parsed.badgeLabel}
+                                    </span>
+                                    <span className="text-sm font-bold text-white">
+                                      {parsed.summaryText}
+                                    </span>
+                                  </div>
+                                  {parsed.pulpitScript && (
+                                    <div className="ml-7 p-2.5 rounded-lg bg-slate-900/90 border border-blue-500/30 text-xs text-blue-200 leading-relaxed">
+                                      <span className="text-2xs font-bold uppercase tracking-wider text-blue-400 block mb-0.5">
+                                        Texto para leer en el púlpito:
+                                      </span>
+                                      {parsed.pulpitScript}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : (
                           <div className="text-xs text-slate-400 italic">
@@ -408,12 +447,30 @@ export default function MeetingLivePage({
 
                     {/* Himno */}
                     {item.item_type === "HYMN" && (
-                      <div className="text-sm text-blue-300 font-medium flex items-center gap-1.5 pt-0.5">
-                        <Music className="w-4 h-4 shrink-0" />
-                        <span>
-                          {item.hymn_number ? `Himno Nº ${item.hymn_number}` : "Himno"}
-                          {item.hymn_title ? ` — "${item.hymn_title}"` : ""}
-                        </span>
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        <div className="text-sm text-blue-300 font-semibold flex items-center gap-1.5">
+                          <Music className="w-4 h-4 shrink-0 text-blue-400" />
+                          <span>
+                            {item.hymn_number ? `Himno Nº ${item.hymn_number}` : "Himno"}
+                            {item.hymn_title ? ` — "${item.hymn_title}"` : ""}
+                          </span>
+                        </div>
+                        <a
+                          href={getHymnGospelLibraryUrl(item.hymn_number, item.hymn_title)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs transition-colors"
+                          title="Abrir letra, partitura y reproductor de audio en la Biblioteca del Evangelio"
+                        >
+                          <PlayCircle className="w-4 h-4 shrink-0" />
+                          <span>
+                            {item.hymn_number
+                              ? `Reproducir #${item.hymn_number} en Biblioteca del Evangelio`
+                              : "Abrir Biblioteca del Evangelio"}
+                          </span>
+                          <ExternalLink className="w-3.5 h-3.5 opacity-80 shrink-0" />
+                        </a>
                       </div>
                     )}
 

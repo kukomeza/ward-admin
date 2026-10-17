@@ -2,9 +2,15 @@
 
 import { useEffect, useState, use } from "react";
 import { Meeting, MeetingItem, TaskAssignment } from "@/lib/types";
-import { parseAnnouncementList, isSacramentItem, parseSacramentAssignments } from "@/lib/translations";
-import { ArrowLeft, Printer, Loader2 } from "lucide-react";
+import {
+  parseAnnouncementList,
+  isSacramentItem,
+  parseSacramentAssignments,
+  parseOfficialBusinessItem,
+} from "@/lib/translations";
+import { ArrowLeft, Printer, Loader2, PlayCircle, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { getHymnGospelLibraryUrl } from "@/lib/hymns";
 
 export default function MeetingPrintPage({
   params,
@@ -143,19 +149,52 @@ export default function MeetingPrintPage({
                   )}
 
                   {item.item_type === "ANNOUNCEMENT" && (
-                    <div className="ml-5 mt-1 space-y-0.5">
-                      {parseAnnouncementList(item.notes).map((asunto, aIdx) => (
-                        <div key={aIdx} className="text-xs text-slate-800 font-sans">
-                          {aIdx + 1}. {asunto}
-                        </div>
-                      ))}
+                    <div className="ml-5 mt-1.5 space-y-1.5">
+                      {parseAnnouncementList(item.notes).map((asunto, aIdx) => {
+                        const parsed = parseOfficialBusinessItem(asunto);
+                        return (
+                          <div key={aIdx} className="text-xs text-slate-800 font-sans">
+                            <div>
+                              <span className="font-bold">{aIdx + 1}. </span>
+                              {parsed.type !== "ANNOUNCEMENT" && (
+                                <span className="font-bold uppercase text-2xs px-1.5 py-0.5 rounded-sm bg-slate-100 border border-slate-300 mr-1.5">
+                                  {parsed.badgeLabel}
+                                </span>
+                              )}
+                              <span className="font-semibold">{parsed.summaryText}</span>
+                            </div>
+                            {parsed.pulpitScript && (
+                              <div className="text-2xs text-slate-600 italic ml-4 mt-0.5">
+                                {parsed.pulpitScript}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
                   {item.item_type === "HYMN" && (
-                    <div className="text-xs text-slate-600 font-sans italic ml-5 mt-0.5">
-                      {item.hymn_number ? `Nº ${item.hymn_number}` : ""}
-                      {item.hymn_title ? ` "${item.hymn_title}"` : ""}
+                    <div className="text-xs text-slate-600 font-sans ml-5 mt-1 flex flex-wrap items-center gap-2">
+                      <span className="italic">
+                        {item.hymn_number ? `Nº ${item.hymn_number}` : ""}
+                        {item.hymn_title ? ` "${item.hymn_title}"` : ""}
+                      </span>
+                      <a
+                        href={getHymnGospelLibraryUrl(item.hymn_number, item.hymn_title)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-semibold text-2xs transition-colors print:border-0 print:bg-transparent print:p-0 print:text-slate-500"
+                        title="Reproducir himno en la Biblioteca del Evangelio"
+                      >
+                        <PlayCircle className="w-3 h-3 shrink-0 print:hidden" />
+                        <span className="print:hidden">
+                          {item.hymn_number
+                            ? `Reproducir #${item.hymn_number} en Biblioteca del Evangelio`
+                            : "Biblioteca del Evangelio"}
+                        </span>
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0 print:hidden" />
+                      </a>
                     </div>
                   )}
 

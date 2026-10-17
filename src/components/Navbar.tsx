@@ -8,6 +8,7 @@ import {
   Tag, 
   RotateCcw, 
   BookOpen,
+  BarChart3,
   Menu,
   X
 } from "lucide-react";
@@ -19,6 +20,7 @@ export default function Navbar() {
 
   const navLinks = [
     { href: "/", label: "Reuniones", icon: Calendar },
+    { href: "/attendance", label: "Asistencia y Ministración", icon: BarChart3 },
     { href: "/persons", label: "Directorio", icon: Users },
     { href: "/tasks", label: "Tareas y Tipos", icon: Tag },
     { href: "/rotation", label: "Rotación y Auditoría", icon: RotateCcw },

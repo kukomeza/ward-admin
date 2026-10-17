@@ -15,7 +15,9 @@ import {
   UserCheck,
   Loader2,
   Sparkles,
+  BarChart3,
 } from "lucide-react";
+import Link from "next/link";
 
 interface MeetingAttendanceManagerProps {
   meetingId: string;
@@ -271,6 +273,15 @@ export default function MeetingAttendanceManager({
             >
               Anota las familias o personas asistentes y la cantidad de integrantes. Los nombres quedan guardados para futuras reuniones.
             </p>
+            <Link
+              href="/attendance"
+              className={`mt-1.5 inline-flex items-center gap-1 text-2xs font-bold underline-offset-2 hover:underline ${
+                darkMode ? "text-emerald-400" : "text-emerald-700"
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Ver tendencia trimestral, historial por familia y alertas de ministración →</span>
+            </Link>
           </div>
         </div>
 
