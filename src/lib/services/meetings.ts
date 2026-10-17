@@ -152,6 +152,24 @@ export async function getMeetingById(id: string): Promise<{
   };
 }
 
+const FAST_SUNDAY_TEMPLATE: AgendaTemplateItem[] = [
+  { item_type: "WELCOME", title: "Bienvenida y Reconocimiento de Autoridades" },
+  { item_type: "HYMN", title: "Himno de Apertura", task_code: "MUSIC_CONDUCT" },
+  { item_type: "PRAYER", title: "Primera Oración", task_code: "PRAYER" },
+  { item_type: "ANNOUNCEMENT", title: "Asuntos de Barrio y Anuncios", task_code: "ANNOUNCEMENT" },
+  { item_type: "HYMN", title: "Himno Sacramental", task_code: "MUSIC_CONDUCT" },
+  { item_type: "ORDINANCE", title: "Administración de la Santa Cena", task_code: "BLESS_SACRAMENT" },
+  {
+    item_type: "TESTIMONY",
+    title: "Testimonios de los Miembros",
+    task_code: "TESTIFY",
+    notes:
+      "Quien dirige comparte un breve testimonio e invita a los hermanos a compartir testimonios breves centrados en Jesucristo.",
+  },
+  { item_type: "HYMN", title: "Himno Final", task_code: "MUSIC_CONDUCT" },
+  { item_type: "PRAYER", title: "Última Oración", task_code: "PRAYER" },
+];
+
 export async function createMeeting(data: {
   meeting_type_id: string;
   meeting_date: string;
@@ -161,6 +179,7 @@ export async function createMeeting(data: {
   conducting_person_id?: string;
   notes?: string;
   apply_template?: boolean;
+  is_fast_sunday?: boolean;
 }): Promise<string> {
   await ensureDatabase();
 
@@ -195,7 +214,12 @@ export async function createMeeting(data: {
     if (presideTask.rows.length > 0) {
       await db.execute({
         sql: `INSERT INTO task_assignments (id, meeting_id, person_id, task_type_id, status) VALUES (?, ?, ?, ?, 'CONFIRMED')`,
-        args: [`assign-${Date.now()}-pres`, id, data.presiding_person_id, String(presideTask.rows[0].id)],
+        args: [
+          `assign-${Date.now()}-${Math.random().toString(36).slice(2, 5)}-pres`,
+          id,
+          data.presiding_person_id,
+          String(presideTask.rows[0].id),
+        ],
       });
     }
   }
@@ -208,43 +232,55 @@ export async function createMeeting(data: {
     if (conductTask.rows.length > 0) {
       await db.execute({
         sql: `INSERT INTO task_assignments (id, meeting_id, person_id, task_type_id, status) VALUES (?, ?, ?, ?, 'CONFIRMED')`,
-        args: [`assign-${Date.now()}-cond`, id, data.conducting_person_id, String(conductTask.rows[0].id)],
+        args: [
+          `assign-${Date.now()}-${Math.random().toString(36).slice(2, 5)}-cond`,
+          id,
+          data.conducting_person_id,
+          String(conductTask.rows[0].id),
+        ],
       });
     }
   }
 
   // Auto-apply template if requested (default true)
   if (data.apply_template !== false) {
-    const mtRes = await db.execute({
-      sql: `SELECT default_template FROM meeting_types WHERE id = ?`,
-      args: [data.meeting_type_id],
-    });
+    let templateItems: AgendaTemplateItem[] = [];
 
-    if (mtRes.rows.length > 0 && mtRes.rows[0].default_template) {
-      try {
-        const templateItems: AgendaTemplateItem[] = JSON.parse(String(mtRes.rows[0].default_template));
-        for (let idx = 0; idx < templateItems.length; idx++) {
-          const item = templateItems[idx];
-          const itemId = `mi-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 5)}`;
-          await db.execute({
-            sql: `
-              INSERT INTO meeting_items (id, meeting_id, order_index, item_type, title, speaker_topic, notes, is_completed)
-              VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-            `,
-            args: [
-              itemId,
-              id,
-              idx,
-              item.item_type,
-              item.title,
-              item.speaker_topic || null,
-              item.notes || null,
-            ],
-          });
+    if (data.is_fast_sunday) {
+      templateItems = FAST_SUNDAY_TEMPLATE;
+    } else {
+      const mtRes = await db.execute({
+        sql: `SELECT default_template FROM meeting_types WHERE id = ?`,
+        args: [data.meeting_type_id],
+      });
+
+      if (mtRes.rows.length > 0 && mtRes.rows[0].default_template) {
+        try {
+          templateItems = JSON.parse(String(mtRes.rows[0].default_template));
+        } catch (err) {
+          console.error("Failed to parse meeting template:", err);
         }
-      } catch (err) {
-        console.error("Failed to parse meeting template:", err);
       }
+    }
+
+    for (let idx = 0; idx < templateItems.length; idx++) {
+      const item = templateItems[idx];
+      const itemId = `mi-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 5)}`;
+      await db.execute({
+        sql: `
+          INSERT INTO meeting_items (id, meeting_id, order_index, item_type, title, speaker_topic, notes, is_completed)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+        `,
+        args: [
+          itemId,
+          id,
+          idx,
+          item.item_type,
+          item.title,
+          item.speaker_topic || null,
+          item.notes || null,
+        ],
+      });
     }
   }
 

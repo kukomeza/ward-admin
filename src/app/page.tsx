@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import NewMeetingModal from "@/components/NewMeetingModal";
+import GenerateMonthModal from "@/components/GenerateMonthModal";
 import { Meeting } from "@/lib/types";
 import { formatMeetingStatus } from "@/lib/translations";
 import { 
@@ -26,6 +27,7 @@ export default function HomePage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMonthModalOpen, setIsMonthModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
 
@@ -93,13 +95,22 @@ export default function HomePage() {
             </p>
           </div>
 
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-xs transition-colors shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nueva Reunión</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => setIsMonthModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Generar Domingos del Mes</span>
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nueva Reunión</span>
+            </button>
+          </div>
         </div>
 
         {/* Filters and Search Bar */}
@@ -271,11 +282,17 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Modal */}
+        {/* Modals */}
         <NewMeetingModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onCreated={loadMeetings}
+        />
+        <GenerateMonthModal
+          isOpen={isMonthModalOpen}
+          onClose={() => setIsMonthModalOpen(false)}
+          existingMeetings={meetings}
+          onGenerated={loadMeetings}
         />
       </main>
     </div>

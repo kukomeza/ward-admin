@@ -30,6 +30,15 @@ export default function NewMeetingModal({
   const [presidingPersonId, setPresidingPersonId] = useState("");
   const [conductingPersonId, setConductingPersonId] = useState("");
   const [applyTemplate, setApplyTemplate] = useState(true);
+  const [isFastSunday, setIsFastSunday] = useState(false);
+
+  const checkIsFirstSunday = (dateStr: string): boolean => {
+    if (!dateStr) return false;
+    const [y, m, d] = dateStr.split("-").map(Number);
+    if (!y || !m || !d) return false;
+    const dt = new Date(y, m - 1, d);
+    return dt.getDay() === 0 && d <= 7;
+  };
 
   // Auto-set next Sunday as default date
   useEffect(() => {
@@ -41,8 +50,10 @@ export default function NewMeetingModal({
     const nextSunday = new Date(today);
     nextSunday.setDate(today.getDate() + daysUntilSunday);
     const dateStr = nextSunday.toISOString().split("T")[0];
+    const firstSun = checkIsFirstSunday(dateStr);
 
     setMeetingDate(dateStr);
+    setIsFastSunday(firstSun);
 
     async function loadMeta() {
       try {
@@ -57,7 +68,12 @@ export default function NewMeetingModal({
           setMeetingTypes(typesData.data);
           const defaultType = typesData.data[0];
           setMeetingTypeId(defaultType.id);
-          setTitle(`${defaultType.name} - ${dateStr}`);
+          const isSacramental = defaultType.code === "SACRAMENTAL";
+          setTitle(
+            isSacramental && firstSun
+              ? `Reunión de Ayuno y Testimonios - ${dateStr}`
+              : `${defaultType.name} - ${dateStr}`
+          );
         }
 
         if (personsData.success) {
@@ -76,19 +92,49 @@ export default function NewMeetingModal({
     setMeetingTypeId(typeId);
     const selected = meetingTypes.find((t) => t.id === typeId);
     if (selected) {
-      setTitle(`${selected.name} - ${meetingDate}`);
+      const isSac = selected.code === "SACRAMENTAL";
+      if (!isSac) setIsFastSunday(false);
+      setTitle(
+        isSac && isFastSunday
+          ? `Reunión de Ayuno y Testimonios - ${meetingDate}`
+          : `${selected.name} - ${meetingDate}`
+      );
     }
   };
 
   const handleDateChange = (date: string) => {
     setMeetingDate(date);
     const selected = meetingTypes.find((t) => t.id === meetingTypeId);
+    const firstSun = checkIsFirstSunday(date);
+    const isSac = selected?.code === "SACRAMENTAL";
+    if (isSac) {
+      setIsFastSunday(firstSun);
+    }
     if (selected) {
-      setTitle(`${selected.name} - ${date}`);
+      setTitle(
+        isSac && firstSun
+          ? `Reunión de Ayuno y Testimonios - ${date}`
+          : `${selected.name} - ${date}`
+      );
+    }
+  };
+
+  const handleFastSundayToggle = (checked: boolean) => {
+    setIsFastSunday(checked);
+    const selected = meetingTypes.find((t) => t.id === meetingTypeId);
+    if (selected && selected.code === "SACRAMENTAL") {
+      setTitle(
+        checked
+          ? `Reunión de Ayuno y Testimonios - ${meetingDate}`
+          : `${selected.name} - ${meetingDate}`
+      );
     }
   };
 
   if (!isOpen) return null;
+
+  const selectedMeetingType = meetingTypes.find((t) => t.id === meetingTypeId);
+  const isSacramentalSelected = selectedMeetingType?.code === "SACRAMENTAL";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +158,7 @@ export default function NewMeetingModal({
             presiding_person_id: presidingPersonId || null,
             conducting_person_id: conductingPersonId || null,
             apply_template: applyTemplate,
+            is_fast_sunday: isSacramentalSelected && isFastSunday,
           }),
         });
 
@@ -259,8 +306,28 @@ export default function NewMeetingModal({
             </div>
           </div>
 
-          {/* Checkbox aplicar plantilla */}
-          <div className="pt-2">
+          {/* Checkbox Domingo de Ayuno y Plantilla */}
+          <div className="pt-2 space-y-2.5">
+            {isSacramentalSelected && (
+              <label className="flex items-center gap-2 p-3 bg-amber-50/70 border border-amber-200 rounded-xl cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isFastSunday}
+                  onChange={(e) => handleFastSundayToggle(e.target.checked)}
+                  className="w-4 h-4 text-amber-600 rounded-sm focus:ring-amber-500"
+                />
+                <div className="text-xs">
+                  <span className="font-semibold text-amber-950 flex items-center gap-1">
+                    Es Domingo de Ayuno y Testimonios
+                  </span>
+                  <p className="text-amber-800">
+                    Reemplaza los bloques de discursos por el bloque de{" "}
+                    <strong>Testimonios de los Miembros</strong> (se detecta automáticamente en el 1er domingo del mes).
+                  </p>
+                </div>
+              </label>
+            )}
+
             <label className="flex items-center gap-2 p-3 bg-blue-50/60 border border-blue-200/70 rounded-xl cursor-pointer">
               <input
                 type="checkbox"
@@ -274,7 +341,7 @@ export default function NewMeetingModal({
                   Cargar plantilla predeterminada de agenda
                 </span>
                 <p className="text-blue-700">
-                  Crea automáticamente los bloques sugeridos (bienvenida, himnos, discursos, etc.)
+                  Crea automáticamente los bloques sugeridos (bienvenida, himnos, Santa Cena, {isFastSunday ? "testimonios" : "discursos"}, etc.)
                 </p>
               </div>
             </label>
